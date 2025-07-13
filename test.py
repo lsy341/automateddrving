@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+print("222")
+
 # 두 벡터 사잇각 계산 (0~180도)
 def get_angle(v1, v2):
     unit_v1 = v1 / np.linalg.norm(v1)
@@ -174,3 +176,5 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+
+# 이상한 문구 추가함
