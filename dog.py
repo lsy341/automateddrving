@@ -3,8 +3,8 @@ import cv2, time, collections
 
 # ─────────────────────────────────────────
 # 설정값
-MODEL_PATH   = "dog.pt"
-VIDEO_PATH   = r"video/dog.mp4"
+MODEL_PATH   = r"C:\Users\geonh\Desktop\중앙대학교\2학년\미래제품연구회\자율주행차량\AFB\automateddriving\best_dog.pt"
+VIDEO_PATH   = r"C:\Users\geonh\Desktop\중앙대학교\2학년\미래제품연구회\자율주행차량\AFB\automateddriving\video\dog.mp4"
 WIN          = "dog obstacle avoidance"
 CONF_THRESH  = 0.3          # 탐지 신뢰도 임계값
 MOVE_THRESH  = 10           # 이동 감지 픽셀
