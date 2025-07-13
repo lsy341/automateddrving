@@ -176,5 +176,3 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
-
-# 이상한 문구 추가함
