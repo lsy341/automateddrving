@@ -37,7 +37,7 @@ def get_intersection(p1, v1, p2, v2):
     return tuple(intersection.astype(int))
 
 # 동영상 캡처 시작 (카메라: 0, 또는 파일 경로)
-cap = cv2.VideoCapture(r'L_6\vod_test.mp4')
+cap = cv2.VideoCapture(r'vod_test.mp4')
 fps = cap.get(cv2.CAP_PROP_FPS)
 delay = int(1000 / fps) if fps > 0 else 30  # ms 단위
 
