@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-print("222")
+print("333")
 
 # 두 벡터 사잇각 계산 (0~180도)
 def get_angle(v1, v2):
