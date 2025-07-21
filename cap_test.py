@@ -19,12 +19,15 @@ def get_tangent(points, x1, x2):
 def filter_outliers(points, axis='x', threshold=50):
     if not points:
         return []
+    
+    # points를 행렬로 변환
     coords = np.array(points)
     center = np.median(coords[:, 0] if axis == 'x' else coords[:, 1])
     diffs = np.abs((coords[:, 0] if axis == 'x' else coords[:, 1]) - center)
     return coords[diffs < threshold].tolist()
 
 def get_intersection(p1, v1, p2, v2):
+    # 두 개의 벡터방정식으로 교점 찾기
     A = np.array([[v1[0], -v2[0]], [v1[1], -v2[1]]])
     b = np.array([p2[0] - p1[0], p2[1] - p1[1]])
     if np.linalg.matrix_rank(A) < 2:
@@ -43,26 +46,35 @@ def process_image(index):
     img = cv2.imread(file_path)
     img = cv2.resize(img, (640, 480))
 
-    roi_y1, roi_y2 = 200, 450
+    roi_y1, roi_y2 = 200, 480
     roi = img[roi_y1:roi_y2, :]
 
-    lower_white = np.array([129, 120, 60])
+    lower_white = np.array([151, 166, 164])
     upper_white = np.array([255, 255, 255])
     mask = cv2.inRange(roi, lower_white, upper_white)
     blurred = cv2.GaussianBlur(mask, (5, 5), 0)
     edges = cv2.Canny(blurred, 100, 150)
+    edges = cv2.resize(edges, (640, 480), interpolation=cv2.INTER_NEAREST)
     color_roi = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    
+    unique_vals = np.unique(edges)
+    print(unique_vals)
 
     left_points, right_points = [], []
     h, w = edges.shape
     mid = w // 2
 
-    for y in range(h - 50, -1, -2):
+    # ROI에서 y는 아래에서 위로 탐색
+    for y in range(h - 1, -1, -2):
         row = edges[y]
+        
+        # 왼쪽 안쪽 차선 탐색
         for x in range(mid - 1, -1, -1):
             if row[x] == 255:
                 left_points.append((x, y))
                 break
+            
+        # 오른쪽 안쪽 차선 탐색
         for x in range(mid + 1, w):
             if row[x] == 255:
                 right_points.append((x, y))
@@ -72,7 +84,9 @@ def process_image(index):
 
     if len(left_points) >= 20 and len(right_points) >= 20:
         left_points = filter_outliers(left_points, axis='x', threshold=10)
+        print(f"left_points {left_points}")
         right_points = filter_outliers(right_points, axis='x', threshold=10)
+        print(f"right_points {right_points}")
 
         for pt in left_points:
             cv2.circle(color_roi, tuple(pt), 3, (255, 255, 0), -1)
@@ -92,16 +106,19 @@ def process_image(index):
             v_right = np.array(right_line[1]) - p_right
             intersection = get_intersection(p_left, v_left, p_right, v_right)
 
-            center = (w // 2, 150)
+            center = (w // 2, 240)
             cv2.circle(color_roi, center, 7, (255, 0, 0), -1)
 
             if intersection:
+                # 교점 존재 시 시각화
                 cv2.circle(color_roi, intersection, 7, (0, 255, 0), -1)
                 cv2.line(color_roi, center, intersection, (255, 255, 255), 2)
 
+                # 중심 → 수직 위쪽으로 기준선 그리기
                 top_of_vertical = (center[0], center[1] - 80)
                 cv2.line(color_roi, center, top_of_vertical, (0, 255, 255), 1)
 
+                # 교점 방향 벡터 계산
                 vec_to_inter = np.array(intersection) - np.array(center)
                 vertical_vec = np.array([0, -1])
                 angle = get_angle(vec_to_inter, vertical_vec)
@@ -111,12 +128,13 @@ def process_image(index):
                 cv2.putText(color_roi, f"Angle: {adjusted_angle:.2f} deg", (30, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-    return img, color_roi
+    return img, color_roi, edges
 
 def on_trackbar(val):
-    img, color_roi = process_image(val)
+    img, color_roi, edges = process_image(val)
     combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
     cv2.imshow('Image Viewer', combined)
+    cv2.imshow('edges', edges)
 
 cv2.namedWindow('Image Viewer')
 cv2.createTrackbar('Index', 'Image Viewer', 0, total_images - 1, on_trackbar)
