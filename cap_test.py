@@ -44,21 +44,23 @@ def get_intersection(p1, v1, p2, v2):
 
 def get_nearest_point(points, target_y, max_diff=5):
     candidates = [(x, y) for (x, y) in points if abs(y - target_y) <= max_diff]
+    print(f"candidates입니다. \n{candidates}\n")
     if not candidates:
         return None
     return min(candidates, key=lambda pt: abs(pt[1] - target_y))
 
-def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(340, 465, 12)), max_diff=5):
+def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(465, 339, -12)), max_diff=5):
     center_points = []
 
     for y in y_samples:
         left_pt = get_nearest_point(left_pts, y, max_diff)
         right_pt = get_nearest_point(right_pts, y, max_diff)
-
+        print(f"left_pt = {left_pt}")
+        print(f"right_pt = {right_pt}")
         if left_pt and right_pt:
             center_x = (left_pt[0] + right_pt[0]) // 2
             center_points.append((center_x, y))
-    
+    print("===========================")
     return center_points
 
 # 이미지 폴더 경로 설정
@@ -115,9 +117,9 @@ def process_image(index):
     
     if len(left_points) >= 80 and len(right_points) >= 80:
         left_points = filter_outliers(left_points, axis='x', threshold=50)
-        # print(f"left_points {len(left_points)}")
+        # print(f"left_points = {len(left_points)}")
         right_points = filter_outliers(right_points, axis='x', threshold=50)
-        # print(f"right_points {len(right_points)}")
+        # print(f"right_points = {len(right_points)}")
 
         for pt in left_points:
             cv2.circle(color_roi, tuple(pt), 3, (255, 255, 0), -1)
@@ -127,7 +129,6 @@ def process_image(index):
         if len(left_points) >= 2 and len(right_points) >= 2:
             left_poly_points = left_points[:10]
             right_poly_points = right_points[:10]
-            print(left_poly_points)
             
             for pt in left_poly_points:
                 cv2.circle(color_roi, pt, 5, (0, 255, 0), -1)
