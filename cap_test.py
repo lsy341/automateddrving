@@ -12,6 +12,12 @@ def get_angle(v1, v2):
 def get_tangent(points, x1, x2):
     x_pts = [x for x, y in points]
     y_pts = [y for x, y in points]
+    
+    if max(x_pts) - min(x_pts) < 1e-6:
+        # x 값이 전부 같음 → 수직선으로 처리
+        x = x_pts[0]
+        return [(x, 0), (x, max(y_pts))]
+    
     coeffs = np.polyfit(x_pts, y_pts, 1)
     a, b = coeffs
     return [(x1, int(a * x1 + b)), (x2, int(a * x2 + b))]
@@ -65,8 +71,9 @@ def process_image(index):
     img = cv2.imread(file_path)
     img = cv2.resize(img, (640, 480))
 
-    roi_y1, roi_y2 = 360, 465
+    roi_y1, roi_y2 = 330, 465
     roi = img[roi_y1:roi_y2, :]
+    cv2.rectangle(img, (0, roi_y1), (640, roi_y2), (0, 255, 0), 2)
 
     lower_white = np.array([151, 166, 164])
     upper_white = np.array([255, 255, 255])
@@ -108,9 +115,9 @@ def process_image(index):
     
     if len(left_points) >= 80 and len(right_points) >= 80:
         left_points = filter_outliers(left_points, axis='x', threshold=50)
-        print(f"left_points {len(left_points)}")
+        # print(f"left_points {len(left_points)}")
         right_points = filter_outliers(right_points, axis='x', threshold=50)
-        print(f"right_points {len(right_points)}")
+        # print(f"right_points {len(right_points)}")
 
         for pt in left_points:
             cv2.circle(color_roi, tuple(pt), 3, (255, 255, 0), -1)
@@ -118,8 +125,17 @@ def process_image(index):
             cv2.circle(color_roi, tuple(pt), 3, (255, 0, 255), -1)
 
         if len(left_points) >= 2 and len(right_points) >= 2:
-            left_line = get_tangent(left_points[:10], 0, 500)
-            right_line = get_tangent(right_points[:10], 20, 639)
+            left_poly_points = left_points[:10]
+            right_poly_points = right_points[:10]
+            print(left_poly_points)
+            
+            for pt in left_poly_points:
+                cv2.circle(color_roi, pt, 5, (0, 255, 0), -1)
+            for pt in right_poly_points:
+                cv2.circle(color_roi, pt, 5, (0, 255, 0), -1)
+                
+            left_line = get_tangent(left_poly_points, 0, 500)
+            right_line = get_tangent(right_poly_points, 20, 639)
 
             cv2.line(color_roi, left_line[0], left_line[1], (0, 255, 255), 2)
             cv2.line(color_roi, right_line[0], right_line[1], (0, 0, 255), 2)
