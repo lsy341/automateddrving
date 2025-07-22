@@ -42,7 +42,7 @@ def get_nearest_point(points, target_y, max_diff=5):
         return None
     return min(candidates, key=lambda pt: abs(pt[1] - target_y))
 
-def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(340, 481, 15)), max_diff=5):
+def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(340, 465, 12)), max_diff=5):
     center_points = []
 
     for y in y_samples:
@@ -118,8 +118,8 @@ def process_image(index):
             cv2.circle(color_roi, tuple(pt), 3, (255, 0, 255), -1)
 
         if len(left_points) >= 2 and len(right_points) >= 2:
-            left_line = get_tangent(left_points, 0, 500)
-            right_line = get_tangent(right_points, 20, 639)
+            left_line = get_tangent(left_points[:10], 0, 500)
+            right_line = get_tangent(right_points[:10], 20, 639)
 
             cv2.line(color_roi, left_line[0], left_line[1], (0, 255, 255), 2)
             cv2.line(color_roi, right_line[0], right_line[1], (0, 0, 255), 2)
@@ -160,13 +160,14 @@ def process_image(index):
             for i in range(len(center_points) - 1):
                 cv2.line(color_roi, center_points[i], center_points[i + 1], (0, 255, 0), 2)  # 초록 선
 
-    return img, color_roi, all_points
+    return img, color_roi, all_points, edges
 
 def on_trackbar(val):
-    img, color_roi, all_points = process_image(val)
+    img, color_roi, all_points, edges = process_image(val)
     combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
     cv2.imshow('Image Viewer', combined)
     cv2.imshow('all points', all_points)
+    cv2.imshow('edges', edges)
 
 cv2.namedWindow('Image Viewer')
 cv2.createTrackbar('Index', 'Image Viewer', 0, total_images - 1, on_trackbar)
