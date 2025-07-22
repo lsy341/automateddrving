@@ -36,6 +36,25 @@ def get_intersection(p1, v1, p2, v2):
     intersection = p1 + t[0] * v1
     return tuple(intersection.astype(int))
 
+def get_nearest_point(points, target_y, max_diff=5):
+    candidates = [(x, y) for (x, y) in points if abs(y - target_y) <= max_diff]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda pt: abs(pt[1] - target_y))
+
+def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(340, 481, 15)), max_diff=5):
+    center_points = []
+
+    for y in y_samples:
+        left_pt = get_nearest_point(left_pts, y, max_diff)
+        right_pt = get_nearest_point(right_pts, y, max_diff)
+
+        if left_pt and right_pt:
+            center_x = (left_pt[0] + right_pt[0]) // 2
+            center_points.append((center_x, y))
+    
+    return center_points
+
 # 이미지 폴더 경로 설정
 image_folder = 'captures'
 image_files = sorted([f for f in os.listdir(image_folder) if f.lower().endswith(('.jpg', '.png'))])
@@ -46,7 +65,7 @@ def process_image(index):
     img = cv2.imread(file_path)
     img = cv2.resize(img, (640, 480))
 
-    roi_y1, roi_y2 = 200, 480
+    roi_y1, roi_y2 = 360, 465
     roi = img[roi_y1:roi_y2, :]
 
     lower_white = np.array([151, 166, 164])
@@ -54,11 +73,10 @@ def process_image(index):
     mask = cv2.inRange(roi, lower_white, upper_white)
     blurred = cv2.GaussianBlur(mask, (5, 5), 0)
     edges = cv2.Canny(blurred, 100, 150)
+    
+    # 애매한 흰색들 255로 설정
     edges = cv2.resize(edges, (640, 480), interpolation=cv2.INTER_NEAREST)
     color_roi = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-    
-    unique_vals = np.unique(edges)
-    print(unique_vals)
 
     left_points, right_points = [], []
     h, w = edges.shape
@@ -79,14 +97,20 @@ def process_image(index):
             if row[x] == 255:
                 right_points.append((x, y))
                 break
-        if len(left_points) >= 20 and len(right_points) >= 20:
+        if len(left_points) >= 80 and len(right_points) >= 80:
             break
-
-    if len(left_points) >= 20 and len(right_points) >= 20:
-        left_points = filter_outliers(left_points, axis='x', threshold=10)
-        print(f"left_points {left_points}")
-        right_points = filter_outliers(right_points, axis='x', threshold=10)
-        print(f"right_points {right_points}")
+        
+    all_points = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    for pt in left_points:
+        cv2.circle(all_points, tuple(pt), 3, (255, 255, 0), -1)
+    for pt in right_points:
+        cv2.circle(all_points, tuple(pt), 3, (255, 0, 255), -1)
+    
+    if len(left_points) >= 80 and len(right_points) >= 80:
+        left_points = filter_outliers(left_points, axis='x', threshold=50)
+        print(f"left_points {len(left_points)}")
+        right_points = filter_outliers(right_points, axis='x', threshold=50)
+        print(f"right_points {len(right_points)}")
 
         for pt in left_points:
             cv2.circle(color_roi, tuple(pt), 3, (255, 255, 0), -1)
@@ -128,13 +152,21 @@ def process_image(index):
                 cv2.putText(color_roi, f"Angle: {adjusted_angle:.2f} deg", (30, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-    return img, color_roi, edges
+            # 중심선 점 + 선 시각화 추가
+            center_points = get_center_points_by_nearest(left_points, right_points)
+            for pt in center_points:
+                cv2.circle(color_roi, pt, 3, (0, 255, 0), -1)  # 초록 점
+
+            for i in range(len(center_points) - 1):
+                cv2.line(color_roi, center_points[i], center_points[i + 1], (0, 255, 0), 2)  # 초록 선
+
+    return img, color_roi, all_points
 
 def on_trackbar(val):
-    img, color_roi, edges = process_image(val)
+    img, color_roi, all_points = process_image(val)
     combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
     cv2.imshow('Image Viewer', combined)
-    cv2.imshow('edges', edges)
+    cv2.imshow('all points', all_points)
 
 cv2.namedWindow('Image Viewer')
 cv2.createTrackbar('Index', 'Image Viewer', 0, total_images - 1, on_trackbar)
