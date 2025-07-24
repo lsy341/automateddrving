@@ -87,7 +87,7 @@ def is_curve(points, threshold=0.0009):
         return False
 
 def warp_image(image, src_points):
-    width, height = 640, 480  # 출력 이미지 크기 고정
+    width, height = 640, 135  # 출력 이미지 크기 고정
     dst_points = np.array([
         [0, 0],
         [width - 1, 0],
@@ -103,10 +103,10 @@ def warp_image(image, src_points):
 
 # 640x480 해상도 기준 좌표로 설정해야 함 (직접 클릭하거나 측정 필요)
 src_points = np.array([
-    [21, 34],  # 왼쪽 위
-    [619, 38],  # 오른쪽 위
-    [618, 116],  # 오른쪽 아래
-    [24, 119]   # 왼쪽 아래
+    [25, 14],  # 왼쪽 위
+    [609, 20],  # 오른쪽 위
+    [496, 126],  # 오른쪽 아래
+    [129, 128]   # 왼쪽 아래
 ], dtype=np.float32)
 
 # 마우스 이벤트 콜백 함수
@@ -164,7 +164,7 @@ def process_image(index):
             if row[x] == 255:
                 right_points.append((x, y))
                 break
-        if len(left_points) >= 80 and len(right_points) >= 80:
+        if len(left_points) >= 30 and len(right_points) >= 30:
             break
     print(len(left_points), len(right_points))    
     all_points = cv2.cvtColor(birdeye_frame, cv2.COLOR_GRAY2BGR)
@@ -186,7 +186,7 @@ def process_image(index):
         
     color_roi = cv2.cvtColor(birdeye_frame, cv2.COLOR_GRAY2BGR)
     
-    if len(left_points) >= 80 and len(right_points) >= 80:
+    if len(left_points) >= 30 and len(right_points) >= 30:
         all_left_points = left_points
         all_right_points = right_points
         left_points = filter_outliers(left_points, axis='x', threshold=10)
