@@ -49,7 +49,7 @@ def get_nearest_point(points, target_y, max_diff=5):
         return None
     return min(candidates, key=lambda pt: abs(pt[1] - target_y))
 
-def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(465, 339, -12)), max_diff=5):
+def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(135, -1, -9)), max_diff=5):
     center_points = []
 
     for y in y_samples:
@@ -84,7 +84,8 @@ def process_image(index):
     edges = cv2.Canny(blurred, 100, 150)
     
     # 애매한 흰색들 255로 설정
-    edges = cv2.resize(edges, (640, 480), interpolation=cv2.INTER_NEAREST)
+    # edges = cv2.resize(edges, (640, 480), interpolation=cv2.INTER_NEAREST)
+    _, edges = cv2.threshold(edges, 127, 255, cv2.THRESH_BINARY)  # 완전한 이진화
     color_roi = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
 
     left_points, right_points = [], []
@@ -106,21 +107,21 @@ def process_image(index):
             if row[x] == 255:
                 right_points.append((x, y))
                 break
-        if len(left_points) >= 80 and len(right_points) >= 80:
+        if len(left_points) >= 30 and len(right_points) >= 30:
             break
-        
+    print(len(left_points), len(right_points))    
     all_points = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
     for pt in left_points:
         cv2.circle(all_points, tuple(pt), 3, (255, 255, 0), -1)
     for pt in right_points:
         cv2.circle(all_points, tuple(pt), 3, (255, 0, 255), -1)
     
-    if len(left_points) >= 80 and len(right_points) >= 80:
-        left_points = filter_outliers(left_points, axis='x', threshold=50)
+    if len(left_points) >= 30 and len(right_points) >= 30:
+        left_points = filter_outliers(left_points, axis='x', threshold=30)
         # print(f"left_points = {len(left_points)}")
-        right_points = filter_outliers(right_points, axis='x', threshold=50)
+        right_points = filter_outliers(right_points, axis='x', threshold=30)
         # print(f"right_points = {len(right_points)}")
-
+        print(right_points)
         for pt in left_points:
             cv2.circle(color_roi, tuple(pt), 3, (255, 255, 0), -1)
         for pt in right_points:
@@ -181,8 +182,10 @@ def process_image(index):
 
 def on_trackbar(val):
     img, color_roi, all_points, edges = process_image(val)
-    combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
-    cv2.imshow('Image Viewer', combined)
+    # combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
+    # cv2.imshow('Image Viewer', combined)
+    cv2.imshow('original img', img)
+    cv2.imshow('color roi', color_roi)
     cv2.imshow('all points', all_points)
     cv2.imshow('edges', edges)
 
