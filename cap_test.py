@@ -49,9 +49,14 @@ def get_nearest_point(points, target_y, max_diff=5):
         return None
     return min(candidates, key=lambda pt: abs(pt[1] - target_y))
 
-def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(465, 339, -12)), max_diff=5):
+def get_center_points_by_nearest(left_pts, right_pts, max_diff=5):
     center_points = []
-
+    l_y = min(left_pts, key=lambda pt: pt[1])
+    r_y = min(right_pts, key=lambda pt: pt[1])
+    min_y = min(l_y[1], r_y[1])
+    
+    y_samples = list(range(480, min_y, -((480 - min_y)//10)))
+    
     for y in y_samples:
         left_pt = get_nearest_point(left_pts, y, max_diff)
         right_pt = get_nearest_point(right_pts, y, max_diff)
@@ -60,9 +65,55 @@ def get_center_points_by_nearest(left_pts, right_pts, y_samples = list(range(465
         if left_pt and right_pt:
             center_x = (left_pt[0] + right_pt[0]) // 2
             center_points.append((center_x, y))
+    print(min_y)
     print("===========================")
     return center_points
 
+def is_curve(points, threshold=0.0009):
+    # 주어진 (x, y) 점들로부터 곡선 여부를 판단합니다.
+    # 2차항 계수 a의 절댓값이 threshold 이상이면 곡선으로 간주합니다.
+    if len(points) < 3:
+        return False  # 점이 너무 적으면 곡선 판단 불가
+
+    x_pts = [x for x, y in points]
+    y_pts = [y for x, y in points]
+
+    try:
+        coeffs = np.polyfit(y_pts, x_pts, 2)  # x = ay² + by + c
+        a = coeffs[0]
+        print(a)
+        return abs(a) > threshold
+    except Exception:
+        return False
+
+def warp_image(image, src_points):
+    width, height = 640, 135  # 출력 이미지 크기 고정
+    dst_points = np.array([
+        [0, 0],
+        [width - 1, 0],
+        [width - 1, height - 1],
+        [0, height - 1]
+    ], dtype=np.float32)
+
+    # 원근 변환 행렬 계산
+    matrix = cv2.getPerspectiveTransform(src_points, dst_points)
+    warped_image = cv2.warpPerspective(image, matrix, (width, height))
+    
+    return warped_image
+
+# 640x480 해상도 기준 좌표로 설정해야 함 (직접 클릭하거나 측정 필요)
+src_points = np.array([
+    [25, 14],  # 왼쪽 위
+    [609, 20],  # 오른쪽 위
+    [496, 126],  # 오른쪽 아래
+    [129, 128]   # 왼쪽 아래
+], dtype=np.float32)
+
+# 마우스 이벤트 콜백 함수
+def mouse_callback(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        print(f"Clicked coordinates: ({x}, {y})")
+        
 # 이미지 폴더 경로 설정
 image_folder = 'captures'
 image_files = sorted([f for f in os.listdir(image_folder) if f.lower().endswith(('.jpg', '.png'))])
@@ -84,16 +135,23 @@ def process_image(index):
     edges = cv2.Canny(blurred, 100, 150)
     
     # 애매한 흰색들 255로 설정
-    edges = cv2.resize(edges, (640, 480), interpolation=cv2.INTER_NEAREST)
-    color_roi = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    # edges = cv2.resize(edges, (640, 480), interpolation=cv2.INTER_NEAREST)
+    _, edges = cv2.threshold(edges, 127, 255, cv2.THRESH_BINARY)  # 완전한 이진화
+    # color_roi = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    
+    # Bird's Eye View 변환
+    birdeye_frame = warp_image(edges, src_points)
+    _, birdeye_frame = cv2.threshold(birdeye_frame, 127, 255, cv2.THRESH_BINARY)  # 완전한 이진화
+    print("birdeye_frame shape:", birdeye_frame.shape)
+    cv2.imwrite("debug_birdeye.jpg", birdeye_frame)
 
     left_points, right_points = [], []
-    h, w = edges.shape
+    h, w = birdeye_frame.shape
     mid = w // 2
 
     # ROI에서 y는 아래에서 위로 탐색
     for y in range(h - 1, -1, -2):
-        row = edges[y]
+        row = birdeye_frame[y]
         
         # 왼쪽 안쪽 차선 탐색
         for x in range(mid - 1, -1, -1):
@@ -106,21 +164,36 @@ def process_image(index):
             if row[x] == 255:
                 right_points.append((x, y))
                 break
-        if len(left_points) >= 80 and len(right_points) >= 80:
+        if len(left_points) >= 30 and len(right_points) >= 30:
             break
-        
-    all_points = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    print(len(left_points), len(right_points))    
+    all_points = cv2.cvtColor(birdeye_frame, cv2.COLOR_GRAY2BGR)
     for pt in left_points:
         cv2.circle(all_points, tuple(pt), 3, (255, 255, 0), -1)
     for pt in right_points:
         cv2.circle(all_points, tuple(pt), 3, (255, 0, 255), -1)
-    
-    if len(left_points) >= 80 and len(right_points) >= 80:
-        left_points = filter_outliers(left_points, axis='x', threshold=50)
-        # print(f"left_points = {len(left_points)}")
-        right_points = filter_outliers(right_points, axis='x', threshold=50)
-        # print(f"right_points = {len(right_points)}")
+        
+    # # 곡선 여부에 따라 그릴지 결정
+    # if is_curve(left_points):
+    #     print("왼쪽 차선은 곡선입니다.")
+    # else:
+    #     print("왼쪽 차선은 곡선이 아닙니다.")
 
+    # if is_curve(right_points):
+    #     print("오른쪽 차선은 곡선입니다.")
+    # else:
+    #     print("오른쪽 차선은 곡선이 아닙니다.")
+        
+    color_roi = cv2.cvtColor(birdeye_frame, cv2.COLOR_GRAY2BGR)
+    
+    if len(left_points) >= 30 and len(right_points) >= 30:
+        all_left_points = left_points
+        all_right_points = right_points
+        left_points = filter_outliers(left_points, axis='x', threshold=10)
+        # print(f"left_points = {len(left_points)}")
+        right_points = filter_outliers(right_points, axis='x', threshold=10)
+        # print(f"right_points = {len(right_points)}")
+        # print(right_points)
         for pt in left_points:
             cv2.circle(color_roi, tuple(pt), 3, (255, 255, 0), -1)
         for pt in right_points:
@@ -170,21 +243,26 @@ def process_image(index):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
             # 중심선 점 + 선 시각화 추가
-            center_points = get_center_points_by_nearest(left_points, right_points)
+            center_points = get_center_points_by_nearest(all_left_points, all_right_points)
+            center_points = filter_outliers(center_points, 'x', threshold=10)
             for pt in center_points:
                 cv2.circle(color_roi, pt, 3, (0, 255, 0), -1)  # 초록 점
 
             for i in range(len(center_points) - 1):
                 cv2.line(color_roi, center_points[i], center_points[i + 1], (0, 255, 0), 2)  # 초록 선
 
-    return img, color_roi, all_points, edges
+    return img, color_roi, all_points, edges, birdeye_frame
 
 def on_trackbar(val):
-    img, color_roi, all_points, edges = process_image(val)
-    combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
-    cv2.imshow('Image Viewer', combined)
+    img, color_roi, all_points, edges, birdeye_frame = process_image(val)
+    # combined = cv2.hconcat([img, cv2.resize(color_roi, (640, 480))])
+    # cv2.imshow('Image Viewer', combined)
+    cv2.imshow('original img', img)
+    cv2.imshow('color roi', color_roi)
     cv2.imshow('all points', all_points)
     cv2.imshow('edges', edges)
+    cv2.imshow('birdeye', birdeye_frame)
+    cv2.setMouseCallback("edges", mouse_callback)
 
 cv2.namedWindow('Image Viewer')
 cv2.createTrackbar('Index', 'Image Viewer', 0, total_images - 1, on_trackbar)
